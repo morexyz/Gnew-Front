@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Gnew — Setup (Ethereum Mainnet)</title>
+  <style>
+    body { font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial; max-width: 980px; margin: 24px auto; padding: 0 14px; }
+    h2 { margin: 0 0 8px; }
+    .muted { color:#666; }
+    .warn { color:#b00020; font-weight: 800; }
+    .box { border: 1px solid #ddd; border-radius: 14px; padding: 16px; margin: 14px 0; }
+    .row { display:flex; gap: 12px; flex-wrap: wrap; align-items: flex-end; }
+    .row > div { flex: 1; min-width: 300px; }
+    label { display:block; margin: 8px 0 4px; font-weight: 800; }
+    input { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 12px; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; }
+    button { padding: 10px 12px; border: 0; border-radius: 12px; cursor: pointer; margin: 6px 8px 0 0; font-weight: 800; }
+    button.primary { background: #ff7a00; color: white; }
+    button.secondary { background: #f0f0f0; }
+    code, pre { background: #f6f6f6; padding: 10px; border-radius: 12px; display:block; overflow:auto; }
+    .checkboxRow { display:flex; align-items:center; gap:10px; margin-top: 10px; }
+    .checkboxRow input { width: 18px; height: 18px; }
+    .pill { display:inline-block; padding: 4px 10px; border-radius: 999px; background:#eee; font-weight: 800; }
+    .pill.ok { background:#e8fff0; color:#067d17; }
+    .pill.bad { background:#ffecec; color:#b00020; }
+  </style>
+</head>
+<body>
+  <h2>Gnew — Setup</h2>
+  <div class="muted">No external libraries. Requires an EIP-1193 compatible wallet. Network: Ethereum Mainnet.</div>
+  <p class="warn">PRE-DEPLOYMENT: No Gnew contract address is configured. Approval and trading transactions are blocked until a verified Gnew contract is supplied.</p>
+
+  <div class="box">
+    <label>Gnew Contract Address (after deployment)</label>
+    <input id="contract" value="" placeholder="Enter the deployed Gnew contract address (0x...)" autocomplete="off">
+
+    <div class="row">
+      <div>
+        <label>Wallet</label>
+        <code id="wallet">not connected</code>
+      </div>
+      <div>
+        <label>Chain</label>
+        <code id="chain">unknown</code>
+      </div>
+    </div>
+
+    <button class="secondary" id="connect">1) Connect Wallet</button>
+    <button class="secondary" id="loadInfo">2) Load Contract Info</button>
+
+    <div class="row">
+      <div>
+        <label>Owner</label>
+        <code id="owner">-</code>
+      </div>
+      <div>
+        <label>Operator</label>
+        <code id="operator">-</code>
+      </div>
+    </div>
+    <div class="row">
+      <div>
+        <label>Pool</label>
+        <code id="pool">-</code>
+      </div>
+      <div>
+        <label>token1 / token2</label>
+        <code id="tokens">-</code>
+      </div>
+    </div>
+    <div class="row">
+      <div>
+        <label>Config (ONE1, ONE2, token1IsPoolToken0, subscriptionEnabled)</label>
+        <code id="config">-</code>
+      </div>
+    </div>
+  </div>
+
+  <div class="row">
+    <!-- PAXG panel -->
+    <div class="box" style="margin:0;">
+      <h3 style="margin:0 0 6px;">PAXG Approve</h3>
+      <div class="muted">Token: <code id="paxgTokenLabel">-</code></div>
+      <label>PAXG token address</label>
+      <input id="paxg" value="0x45804880De22913dAFE09f4980848ECE6EcbAf78">
+
+      <div class="warn">MAX is off by default. Enter a limited raw-unit amount before approval.</div>
+      <div class="checkboxRow">
+        <input type="checkbox" id="useMaxPaxg">
+        <label for="useMaxPaxg" style="margin:0;">Use MAX allowance (PAXG)</label>
+      </div>
+
+      <label>Approve amount (raw units, PAXG)</label>
+      <input id="approveAmountPaxg" value="0">
+      <div class="muted">If MAX is enabled, amount is ignored. PAXG has 18 decimals (1 PAXG = 1,000,000,000,000,000,000 raw units).</div>
+
+      <button class="secondary" id="approvePaxgBtn">Approve PAXG</button>
+      <button class="secondary" id="revokePaxgBtn">Revoke PAXG (approve 0)</button>
+    </div>
+
+    <!-- XAUt panel -->
+    <div class="box" style="margin:0;">
+      <h3 style="margin:0 0 6px;">XAUt Approve</h3>
+      <div class="muted">Token: <code id="xautTokenLabel">-</code></div>
+      <label>XAUt token address</label>
+      <input id="xaut" value="0x68749665FF8D2d112Fa859AA293F07A622782F38">
+
+      <div class="warn">MAX is off by default. Enter a limited raw-unit amount before approval.</div>
+      <div class="checkboxRow">
+        <input type="checkbox" id="useMaxXaut">
+        <label for="useMaxXaut" style="margin:0;">Use MAX allowance (XAUt)</label>
+      </div>
+
+      <label>Approve amount (raw units, XAUt)</label>
+      <input id="approveAmountXaut" value="0">
+      <div class="muted">If MAX is enabled, amount is ignored. XAUt has 6 decimals (1 XAUt = 1,000,000 raw units).</div>
+
+      <button class="secondary" id="approveXautBtn">Approve XAUt</button>
+      <button class="secondary" id="revokeXautBtn">Revoke XAUt (approve 0)</button>
+    </div>
+  </div>
+
+  <div class="box">
+    <h3 style="margin:0 0 6px;">Run (operator-only)</h3>
+    <div class="muted">⚠️ Only the current <b>operator</b> can call <code>run(user)</code>. If your wallet is not the operator, tx will revert.</div>
+
+    <label>User address</label>
+    <input id="runUser" placeholder="0x...">
+
+    <button class="primary" id="runBtn">Run(user)</button>
+    <button class="secondary" id="readUserStateBtn">Read getUserState(user)</button>
+
+    <label>User State</label>
+    <code id="userState">-</code>
+  </div>
+
+  <div class="box">
+    <label>Log</label>
+    <pre id="log">[ready] Connect → Load Info → Approve (PAXG/XAUt) → Run(user)\n</pre>
+  </div>
+
+<script>
+(() => {
+  // Selectors (4 bytes)
+  const SEL_APPROVE        = "0x095ea7b3";
+  const SEL_RUN            = "0x522bb704"; // run(address)
+  const SEL_GET_USER_STATE = "0x416ae768"; // getUserState(address)
+  const SEL_GET_CONFIG     = "0xc3f909d4"; // getConfig()
+  const SEL_OWNER          = "0x8da5cb5b"; // owner()
+  const SEL_OPERATOR       = "0x570ca735"; // operator()
+  const SEL_POOL           = "0x16f0115b"; // pool()
+  const SEL_TOKEN1         = "0xd21220a7"; // token1()
+  const SEL_TOKEN2         = "0x25be124e"; // token2()
+
+  const ETHEREUM_CHAIN_ID_HEX = "0x1"; // Ethereum Mainnet (chain ID 1)
+  const EXPECTED_PAXG = "0x45804880De22913dAFE09f4980848ECE6EcbAf78".toLowerCase();
+  const EXPECTED_XAUT = "0x68749665FF8D2d112Fa859AA293F07A622782F38".toLowerCase();
+  const EXPECTED_POOL = "0xc756BBA710d45647715079cE50aa16aab36deD42".toLowerCase();
+
+  const logEl = document.getElementById("log");
+  const walletEl = document.getElementById("wallet");
+  const chainEl = document.getElementById("chain");
+
+  const contractIn = document.getElementById("contract");
+  const ownerEl = document.getElementById("owner");
+  const operatorEl = document.getElementById("operator");
+  const poolEl = document.getElementById("pool");
+  const tokensEl = document.getElementById("tokens");
+  const configEl = document.getElementById("config");
+
+  const paxgIn = document.getElementById("paxg");
+  const useMaxPaxgEl = document.getElementById("useMaxPaxg");
+  const approveAmountPaxgEl = document.getElementById("approveAmountPaxg");
+  const paxgTokenLabel = document.getElementById("paxgTokenLabel");
+
+  const xautIn = document.getElementById("xaut");
+  const useMaxXautEl = document.getElementById("useMaxXaut");
+  const approveAmountXautEl = document.getElementById("approveAmountXaut");
+  const xautTokenLabel = document.getElementById("xautTokenLabel");
+
+  const runUserEl = document.getElementById("runUser");
+  const userStateEl = document.getElementById("userState");
+
+  let ethereum = null;
+  let currentAccount = null;
+  let chainId = null;
+
+  function log(msg) {
+    const t = new Date().toISOString().slice(11, 19);
+    logEl.textContent += `[${t}] ${msg}\n`;
+    logEl.scrollTop = logEl.scrollHeight;
+  }
+
+  function mustEth() {
+    if (!window.ethereum || !window.ethereum.request) {
+      throw new Error("MetaMask / EIP-1193 provider not found.");
+    }
+    ethereum = window.ethereum;
+  }
+
+  function normAddr(a) {
+    if (!a) throw new Error("Empty address");
+    a = a.trim();
+    if (!a.startsWith("0x") || a.length !== 42) throw new Error("Bad address: " + a);
+    return a.toLowerCase();
+  }
+
+  function shortAddr(a) {
+    a = normAddr(a);
+    return a.slice(0, 6) + "…" + a.slice(-4);
+  }
+
+  function toHexQuantity(bi) {
+    if (bi === 0n) return "0x0";
+    return "0x" + bi.toString(16);
+  }
+
+  function pad32(hexNo0x) {
+    return hexNo0x.padStart(64, "0");
+  }
+
+  function encodeAddressArg(selector, addr) {
+    const a = normAddr(addr).slice(2);
+    return selector + pad32(a);
+  }
+
+  function encodeApprove(spenderAddr, amountBig) {
+    const spender = normAddr(spenderAddr).slice(2); // 40 hex chars
+    const amountHex = amountBig.toString(16);
+    return SEL_APPROVE + pad32(spender) + pad32(amountHex);
+  }
+
+  function decodeWord(hex, wordIndex) {
+    // hex like 0x + 64*n
+    const start = 2 + wordIndex * 64;
+    return hex.slice(start, start + 64);
+  }
+
+  function decodeAddress(hex, wordIndex) {
+    const w = decodeWord(hex, wordIndex);
+    return "0x" + w.slice(24); // last 20 bytes
+  }
+
+  function decodeUint(hex, wordIndex) {
+    return BigInt("0x" + decodeWord(hex, wordIndex));
+  }
+
+  function decodeBool(hex, wordIndex) {
+    return decodeUint(hex, wordIndex) !== 0n;
+  }
+
+  function updateTokenLabels() {
+    try { paxgTokenLabel.textContent = `${shortAddr(paxgIn.value)} (${normAddr(paxgIn.value)})`; } catch { paxgTokenLabel.textContent = "-"; }
+    try { xautTokenLabel.textContent = `${shortAddr(xautIn.value)} (${normAddr(xautIn.value)})`; } catch { xautTokenLabel.textContent = "-"; }
+  }
+
+  async function connect() {
+    mustEth();
+    const accounts = await ethereum.request({ method: "eth_requestAccounts" });
+    currentAccount = accounts && accounts[0] ? accounts[0] : null;
+    if (!currentAccount) throw new Error("No account selected in wallet.");
+    walletEl.textContent = currentAccount;
+
+    chainId = await ethereum.request({ method: "eth_chainId" });
+    chainEl.textContent = chainId + (chainId === ETHEREUM_CHAIN_ID_HEX ? " (Ethereum Mainnet OK)" : " (NOT Ethereum Mainnet)");
+
+    if (chainId !== ETHEREUM_CHAIN_ID_HEX) {
+      log("Warning: not on Ethereum Mainnet (chainId=0x1). Switch network in MetaMask.");
+    } else {
+      log("Connected to Ethereum Mainnet.");
+    }
+
+    // default runUser to current wallet if empty
+    if (!runUserEl.value) runUserEl.value = currentAccount;
+  }
+
+  async function ethCall(to, data) {
+    mustEth();
+    return await ethereum.request({
+      method: "eth_call",
+      params: [{ to, data }, "latest"]
+    });
+  }
+
+  async function requireEthereumMainnet() {
+    mustEth();
+    const activeChain = await ethereum.request({ method: "eth_chainId" });
+    if (activeChain.toLowerCase() !== ETHEREUM_CHAIN_ID_HEX) {
+      throw new Error("Wrong network. Switch your wallet to Ethereum Mainnet before sending a transaction.");
+    }
+  }
+
+  async function assertGnewContract() {
+    await requireEthereumMainnet();
+    const c = normAddr(contractIn.value);
+    const code = await ethereum.request({ method: "eth_getCode", params: [c, "latest"] });
+    if (!code || code === "0x") throw new Error("No deployed contract at this address on Ethereum Mainnet.");
+    const [paxg, xaut, pool] = await Promise.all([
+      ethCall(c, SEL_TOKEN1), ethCall(c, SEL_TOKEN2), ethCall(c, SEL_POOL)
+    ]);
+    if (decodeAddress(paxg, 0).toLowerCase() !== EXPECTED_PAXG ||
+        decodeAddress(xaut, 0).toLowerCase() !== EXPECTED_XAUT ||
+        decodeAddress(pool, 0).toLowerCase() !== EXPECTED_POOL) {
+      throw new Error("Gnew contract token/pool configuration does not match the expected Ethereum addresses.");
+    }
+  }
+
+  async function sendTx(tx) {
+    await requireEthereumMainnet();
+    const hash = await ethereum.request({ method: "eth_sendTransaction", params: [tx] });
+    log("Tx sent: " + hash);
+    log("Wait for confirmation in wallet / explorer.");
+    return hash;
+  }
+
+  function amountFor(maxEnabled, amountInputEl) {
+    if (maxEnabled) return (2n ** 256n) - 1n;
+    const raw = amountInputEl.value.trim();
+    if (!/^\d+$/.test(raw)) throw new Error("Approve amount must be a non-negative integer (raw units).");
+    return BigInt(raw);
+  }
+
+  async function doApproveToken(tokenAddr, label, maxEnabled, amountInputEl) {
+    if (!currentAccount) await connect();
+    await assertGnewContract();
+    const token = normAddr(tokenAddr);
+    const spender = normAddr(contractIn.value);
+    const amount = amountFor(maxEnabled, amountInputEl);
+    const data = encodeApprove(spender, amount);
+
+    log(`Approve tx (${label}): to=${token}, spender=${spender}, amount=${maxEnabled ? "MAX" : amount.toString()}`);
+    await sendTx({ from: currentAccount, to: token, data });
+  }
+
+  async function doRevokeToken(tokenAddr, label) {
+    if (!currentAccount) await connect();
+    await assertGnewContract();
+    const token = normAddr(tokenAddr);
+    const spender = normAddr(contractIn.value);
+    const data = encodeApprove(spender, 0n);
+
+    log(`Revoke tx (${label}): to=${token}, spender=${spender}, amount=0`);
+    await sendTx({ from: currentAccount, to: token, data });
+  }
+
+  async function loadInfo() {
+    await assertGnewContract();
+    const c = normAddr(contractIn.value);
+
+    const ownerRes = await ethCall(c, SEL_OWNER);
+    const opRes    = await ethCall(c, SEL_OPERATOR);
+    const poolRes  = await ethCall(c, SEL_POOL);
+    const t1Res    = await ethCall(c, SEL_TOKEN1);
+    const t2Res    = await ethCall(c, SEL_TOKEN2);
+    const cfgRes   = await ethCall(c, SEL_GET_CONFIG);
+
+    const owner = decodeAddress(ownerRes, 0);
+    const operator = decodeAddress(opRes, 0);
+    const pool = decodeAddress(poolRes, 0);
+    const token1 = decodeAddress(t1Res, 0);
+    const token2 = decodeAddress(t2Res, 0);
+
+    const ONE1 = decodeUint(cfgRes, 0).toString();
+    const ONE2 = decodeUint(cfgRes, 1).toString();
+    const token1IsPoolToken0 = decodeBool(cfgRes, 2);
+    const subscriptionEnabled = decodeBool(cfgRes, 3);
+
+    ownerEl.textContent = owner;
+    operatorEl.textContent = operator;
+    poolEl.textContent = pool;
+    tokensEl.textContent = `token1=${token1} | token2=${token2}`;
+    configEl.textContent = `ONE1=${ONE1}, ONE2=${ONE2}, token1IsPoolToken0=${token1IsPoolToken0}, subscriptionEnabled=${subscriptionEnabled}`;
+
+    log("Loaded contract info.");
+  }
+
+  async function doRun() {
+    if (!currentAccount) await connect();
+    await assertGnewContract();
+    const c = normAddr(contractIn.value);
+    const user = normAddr(runUserEl.value);
+    const data = encodeAddressArg(SEL_RUN, user);
+
+    log(`run(user) tx: contract=${c}, user=${user}`);
+    await sendTx({ from: currentAccount, to: c, data });
+  }
+
+  async function readUserState() {
+    const c = normAddr(contractIn.value);
+    const user = normAddr(runUserEl.value);
+    const data = encodeAddressArg(SEL_GET_USER_STATE, user);
+
+    const res = await ethCall(c, data);
+
+    // returns: (bool hasEqualized, uint256 lastPrice, uint256 eq1, uint256 eq2, bool isActive, uint256 expirationTime)
+    const hasEqualized = decodeBool(res, 0);
+    const lastPrice = decodeUint(res, 1).toString();
+    const eq1 = decodeUint(res, 2).toString();
+    const eq2 = decodeUint(res, 3).toString();
+    const isActive = decodeBool(res, 4);
+    const expirationTime = decodeUint(res, 5).toString();
+
+    userStateEl.textContent =
+      `hasEqualized=${hasEqualized}, lastPrice=${lastPrice}, eqBalToken1=${eq1}, eqBalToken2=${eq2}, isActive=${isActive}, expirationTime=${expirationTime}`;
+
+    log("Read user state.");
+  }
+
+  document.getElementById("connect").onclick = async () => {
+    try { await connect(); } catch (e) { log("ERROR: " + (e?.message || e)); }
+  };
+
+  document.getElementById("loadInfo").onclick = async () => {
+    try { await loadInfo(); } catch (e) { log("ERROR: " + (e?.message || e)); }
+  };
+
+  document.getElementById("approvePaxgBtn").onclick = async () => {
+    try { await doApproveToken(paxgIn.value, "PAXG", useMaxPaxgEl.checked, approveAmountPaxgEl); }
+    catch (e) { log("ERROR: " + (e?.message || e)); }
+  };
+
+  document.getElementById("approveXautBtn").onclick = async () => {
+    try { await doApproveToken(xautIn.value, "XAUt", useMaxXautEl.checked, approveAmountXautEl); }
+    catch (e) { log("ERROR: " + (e?.message || e)); }
+  };
+
+  document.getElementById("revokePaxgBtn").onclick = async () => {
+    try { await doRevokeToken(paxgIn.value, "PAXG"); }
+    catch (e) { log("ERROR: " + (e?.message || e)); }
+  };
+
+  document.getElementById("revokeXautBtn").onclick = async () => {
+    try { await doRevokeToken(xautIn.value, "XAUt"); }
+    catch (e) { log("ERROR: " + (e?.message || e)); }
+  };
+
+  document.getElementById("runBtn").onclick = async () => {
+    try { await doRun(); } catch (e) { log("ERROR: " + (e?.message || e)); }
+  };
+
+  document.getElementById("readUserStateBtn").onclick = async () => {
+    try { await readUserState(); } catch (e) { log("ERROR: " + (e?.message || e)); }
+  };
+
+  contractIn.addEventListener("input", updateTokenLabels);
+  paxgIn.addEventListener("input", updateTokenLabels);
+  xautIn.addEventListener("input", updateTokenLabels);
+
+  if (window.ethereum?.on) {
+    window.ethereum.on("accountsChanged", (accs) => {
+      currentAccount = accs && accs[0] ? accs[0] : null;
+      walletEl.textContent = currentAccount || "not connected";
+      if (!runUserEl.value && currentAccount) runUserEl.value = currentAccount;
+      log("accountsChanged");
+    });
+    window.ethereum.on("chainChanged", (cid) => {
+      chainId = cid;
+      chainEl.textContent = chainId + (chainId === ETHEREUM_CHAIN_ID_HEX ? " (Ethereum Mainnet OK)" : " (NOT Ethereum Mainnet)");
+      log("chainChanged: " + cid);
+    });
+  }
+
+  updateTokenLabels();
+  log("Ready. Connect → Load Info → Approve (PAXG/XAUt) → Run(user)");
+})();
+</script>
+
+</body>
+</html>

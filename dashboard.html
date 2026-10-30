@@ -1,0 +1,1208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Gnew — On-chain Dashboard (Ethereum Mainnet)</title>
+  <style>
+    body { font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial; max-width: 1180px; margin: 22px auto; padding: 0 14px; }
+    h2 { margin: 0 0 8px; }
+    h3 { margin: 0 0 8px; }
+    .muted { color:#666; }
+    .warn { color:#b00020; font-weight: 900; }
+    .ok { color:#067d17; font-weight: 900; }
+    .box { border: 1px solid #ddd; border-radius: 14px; padding: 14px; margin: 12px 0; }
+    .row { display:flex; gap: 12px; flex-wrap: wrap; align-items: stretch; }
+    .col { flex: 1; min-width: 330px; }
+    label { display:block; margin: 8px 0 4px; font-weight: 900; }
+    input, select { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 12px; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; }
+    button { padding: 10px 12px; border: 0; border-radius: 12px; cursor: pointer; margin: 6px 8px 0 0; font-weight: 900; }
+    button.primary { background: #ff7a00; color: white; }
+    button.secondary { background: #f0f0f0; }
+    code, pre { background: #f6f6f6; padding: 10px; border-radius: 12px; display:block; overflow:auto; }
+    canvas { width: 100%; height: 280px; border-radius: 12px; background: #fff; border: 1px solid #eee; }
+    .cards { display:flex; gap: 10px; flex-wrap: wrap; margin-top: 10px; }
+    .card { flex: 1; min-width: 230px; border: 1px solid #eee; border-radius: 12px; padding: 10px; background: #fafafa; }
+    .big { font-size: 18px; font-weight: 1000; }
+    .small { font-size: 12px; color:#666; }
+    .pill { display:inline-block; padding: 3px 10px; border-radius: 999px; background:#eee; font-weight: 1000; }
+    .pill.ok { background:#e8fff0; color:#067d17; }
+    .pill.bad { background:#ffecec; color:#b00020; }
+    table { width:100%; border-collapse: collapse; }
+    th, td { border-bottom: 1px solid #eee; padding: 8px; text-align: left; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; font-size: 12px; }
+    th { background:#fbfbfb; position: sticky; top: 0; z-index: 1; }
+    .progress { height: 10px; background: #eee; border-radius: 999px; overflow: hidden; }
+    .bar { height: 100%; width: 0%; background: #ff7a00; }
+  </style>
+</head>
+<body>
+  <h2>Gnew — On-chain Dashboard</h2>
+  <div class="muted">
+    Pure on-chain history via <code>eth_getLogs</code>. No external libraries. IPFS-friendly.
+    Requires an EIP-1193 wallet. Network: Ethereum Mainnet.
+  </div>
+
+  <p class="warn">PRE-DEPLOYMENT: Enter the deployed and verified Gnew contract address and its deployment block before loading history. This dashboard is read-only.</p>
+
+  <div class="box">
+    <div class="row">
+      <div class="col">
+        <label>Gnew Contract Address (after deployment)</label>
+        <input id="runner" value="" placeholder="Verified deployed Gnew contract (0x...)" autocomplete="off" />
+      </div>
+      <div class="col">
+        <label>User Address (portfolio wallet)</label>
+        <input id="user" placeholder="0x..." />
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="col">
+        <label>PAXG (token1, 18 decimals) address</label>
+        <input id="token1" value="0x45804880De22913dAFE09f4980848ECE6EcbAf78" />
+      </div>
+      <div class="col">
+        <label>XAUt (token2, 6 decimals) address</label>
+        <input id="token2" value="0x68749665FF8D2d112Fa859AA293F07A622782F38" />
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="col">
+        <label>From Block (scan start)</label>
+        <input id="fromBlock" value="" placeholder="Gnew contract deployment block" />
+        <div class="small">Required: deployment block of the verified Gnew contract (avoid scanning Ethereum from genesis).</div>
+      </div>
+      <div class="col">
+        <label>Initial Chunk Size (blocks)</label>
+        <input id="chunkSize" value="50000" />
+        <div class="small">Auto-shrinks if your RPC says “too many results”.</div>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="col">
+        <label>Wallet</label>
+        <code id="wallet">not connected</code>
+      </div>
+      <div class="col">
+        <label>Chain</label>
+        <code id="chain">unknown</code>
+      </div>
+    </div>
+
+    <button class="secondary" id="connect">1) Connect</button>
+    <button class="secondary" id="loadInfo">2) Load Owner/Operator</button>
+    <button class="primary" id="loadHistory">3) Load Full History (from first Equalize → latest Run)</button>
+
+    <div style="margin-top:10px;">
+      <div class="small">Progress</div>
+      <div class="progress"><div class="bar" id="pbar"></div></div>
+      <div class="small" id="ptext">idle</div>
+    </div>
+
+    <div class="cards">
+      <div class="card">
+        <div class="small">Mode</div>
+        <div class="big" id="mode">-</div>
+        <div class="small" id="modeNote">-</div>
+      </div>
+      <div class="card">
+        <div class="small">Owner</div>
+        <div class="big" id="owner">-</div>
+      </div>
+      <div class="card">
+        <div class="small">Operator</div>
+        <div class="big" id="operator">-</div>
+        <div class="small" id="opCheck">-</div>
+      </div>
+      <div class="card">
+        <div class="small">Runs Found (from first equalize)</div>
+        <div class="big" id="runsFound">-</div>
+        <div class="small" id="rangeInfo">-</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row">
+    <div class="col box">
+      <h3>Balance Over Time (PAXG / XAUt)</h3>
+      <div class="muted">Auto-scaled Y-axis (zoom) so small changes are visible (no “flat line” effect).</div>
+      <canvas id="cBalances"></canvas>
+      <div class="cards">
+        <div class="card">
+          <div class="small">PAXG Change</div>
+          <div class="big" id="paxgDelta">-</div>
+          <div class="small" id="paxgPct">-</div>
+        </div>
+        <div class="card">
+          <div class="small">XAUt Change</div>
+          <div class="big" id="xautDelta">-</div>
+          <div class="small" id="xautPct">-</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col box">
+      <h3>Combined Token Units (Nominal, NOT Value)</h3>
+      <div class="muted">Simple count = PAXG units + XAUt units. NOT a USD valuation, measured gold weight, investment return or profit. Tokens may have different market values. Percent change is relative to the first Equalize snapshot.</div>
+      <canvas id="cValue"></canvas>
+      <div class="cards">
+        <div class="card">
+          <div class="small">Nominal Unit Change</div>
+          <div class="big" id="valDelta">-</div>
+          <div class="small" id="valPct">-</div>
+        </div>
+        <div class="card">
+          <div class="small">Last Nominal Units</div>
+          <div class="big" id="valLast">-</div>
+          <div class="small">Units: nominal PAXG + XAUt token counts (not USD)</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row">
+    <div class="col box">
+      <h3>Top NoSwap Reasons</h3>
+      <div class="muted">Computed from on-chain events <code>RunNoSwap</code> (from first Equalize → latest Run).</div>
+      <canvas id="cReasons"></canvas>
+    </div>
+
+    <div class="col box">
+      <h3>Gas / Transaction Fee Over Time</h3>
+      <div class="muted">Fee = <code>gasUsed × effectiveGasPrice</code> (ETH). Auto-scaled.</div>
+      <canvas id="cFees"></canvas>
+      <div class="small">If your RPC rate-limits receipts, fee points may load slower (progress will show).</div>
+    </div>
+  </div>
+
+  <div class="box">
+    <h3>Runs Table (from first Equalize → latest)</h3>
+    <div class="muted">
+      Includes: success/no-swap/fail, NoSwap reason, contract-reported amounts, tx fee, and tx hash. The event's amountIn is the requested amount, not proof of actual input consumed in a partial swap.
+    </div>
+    <div style="max-height: 420px; overflow:auto; border:1px solid #eee; border-radius: 12px; margin-top:10px;">
+      <table>
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>time</th>
+            <th>block</th>
+            <th>type</th>
+            <th>phase</th>
+            <th>reason / amounts</th>
+            <th>fee (ETH)</th>
+            <th>tx</th>
+          </tr>
+        </thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="box">
+    <label>Log</label>
+    <pre id="log">[ready] Connect → Load Owner/Operator → Load Full History\n</pre>
+  </div>
+
+<script>
+(() => {
+  // ============================================================
+  // Constants
+  // ============================================================
+  const ETHEREUM_CHAIN_ID_HEX = "0x1";
+  const EXPECTED_PAXG = "0x45804880De22913dAFE09f4980848ECE6EcbAf78".toLowerCase();
+  const EXPECTED_XAUT = "0x68749665FF8D2d112Fa859AA293F07A622782F38".toLowerCase();
+  const EXPECTED_POOL = "0xc756BBA710d45647715079cE50aa16aab36deD42".toLowerCase();
+
+  // Function selectors
+  const SEL_OWNER    = "0x8da5cb5b"; // owner()
+  const SEL_OPERATOR = "0x570ca735"; // operator()
+  const SEL_DECIMALS = "0x313ce567"; // decimals()
+  const SEL_TOKEN1   = "0xd21220a7"; // token1()
+  const SEL_TOKEN2   = "0x25be124e"; // token2()
+  const SEL_POOL     = "0x16f0115b"; // pool()
+  const SEL_BALANCE_OF = "0x70a08231"; // balanceOf(address)
+
+  // Event topic0 (keccak256 of signature)
+  // RunNoSwap(address indexed user,bool isEqualizePhase,NoSwapReason reason,uint256 P_now,uint256 P_prev,int256 delta,uint256 baseSell,uint256 eqBalUsed,uint256 amountIn)
+  const TOPIC_RUN_NOSWAP  = "0x4bddec6febc70eba85ad4dcddd2ba5d548fc6ff817e4e7c08f7b71c8bad580ea";
+  // RunSwapOk(address indexed user,bool isEqualizePhase,bool soldToken1,uint256 P_now,uint256 P_prev,int256 delta,uint256 amountIn,uint256 amountOut)
+  const TOPIC_RUN_SWAPOK  = "0x221364e412071934e6eeb2fa5da3cd6a49a57e82b55e92977d4b014eecccbb00";
+  // RunSwapFailed(address indexed user,bool isEqualizePhase,bytes err)
+  const TOPIC_RUN_SWAPFAIL = "0xbdb8d399110053e243f649a2db22e7cecd34d812f4b99df1c045aa61651fb1c5";
+
+  const NoSwapReasonNames = [
+    "UserInactiveOrExpired",
+    "EqualizeNotNeeded",
+    "DeltaIsZero",
+    "BaseSellIsZero",
+    "AmountInIsZero",
+    "EqSnapshotMissing",
+    "InsufficientBalance",
+    "InsufficientAllowance",
+    "MathOverflowGuard",
+    "SwapUnprofitable"
+  ];
+
+  // ============================================================
+  // DOM
+  // ============================================================
+  const logEl = document.getElementById("log");
+  const pbar = document.getElementById("pbar");
+  const ptext = document.getElementById("ptext");
+
+  const runnerEl = document.getElementById("runner");
+  const userEl = document.getElementById("user");
+  const token1El = document.getElementById("token1");
+  const token2El = document.getElementById("token2");
+  const fromBlockEl = document.getElementById("fromBlock");
+  const chunkSizeEl = document.getElementById("chunkSize");
+
+  const walletEl = document.getElementById("wallet");
+  const chainEl = document.getElementById("chain");
+
+  const ownerEl = document.getElementById("owner");
+  const operatorEl = document.getElementById("operator");
+  const opCheckEl = document.getElementById("opCheck");
+
+  const modeEl = document.getElementById("mode");
+  const modeNoteEl = document.getElementById("modeNote");
+  const runsFoundEl = document.getElementById("runsFound");
+  const rangeInfoEl = document.getElementById("rangeInfo");
+
+  const paxgDeltaEl = document.getElementById("paxgDelta");
+  const paxgPctEl = document.getElementById("paxgPct");
+  const xautDeltaEl = document.getElementById("xautDelta");
+  const xautPctEl = document.getElementById("xautPct");
+  const valDeltaEl = document.getElementById("valDelta");
+  const valPctEl = document.getElementById("valPct");
+  const valLastEl = document.getElementById("valLast");
+
+  const tbody = document.getElementById("tbody");
+
+  const cBalances = document.getElementById("cBalances");
+  const cValue = document.getElementById("cValue");
+  const cReasons = document.getElementById("cReasons");
+  const cFees = document.getElementById("cFees");
+
+  // ============================================================
+  // Provider
+  // ============================================================
+  let ethereum = null;
+  let currentAccount = null;
+  let chainId = null;
+
+  function log(msg) {
+    const t = new Date().toISOString().slice(11, 19);
+    logEl.textContent += `[${t}] ${msg}\n`;
+    logEl.scrollTop = logEl.scrollHeight;
+  }
+
+  function setProgress(pct, text) {
+    pbar.style.width = `${Math.max(0, Math.min(100, pct))}%`;
+    ptext.textContent = text || "";
+  }
+
+  function mustEth() {
+    if (!window.ethereum || !window.ethereum.request) throw new Error("MetaMask / EIP-1193 provider not found.");
+    ethereum = window.ethereum;
+  }
+
+  function normAddr(a) {
+    if (!a) throw new Error("Empty address");
+    a = a.trim();
+    if (!a.startsWith("0x") || a.length !== 42) throw new Error("Bad address: " + a);
+    return a.toLowerCase();
+  }
+
+  function pad32(hexNo0x) { return hexNo0x.padStart(64, "0"); }
+
+  function toHexQty(n) {
+    const bi = BigInt(n);
+    if (bi === 0n) return "0x0";
+    return "0x" + bi.toString(16);
+  }
+
+  function topicForAddress(addr) {
+    const a = normAddr(addr).slice(2);
+    // left pad to 32 bytes (64 hex chars): 12 bytes = 24 hex digits
+    return "0x" + "0".repeat(24) + a;
+  }
+
+  function encodeBalanceOf(addr) {
+    const a = normAddr(addr).slice(2);
+    return SEL_BALANCE_OF + pad32(a);
+  }
+
+  function hexToBigInt(hex) { return BigInt(hex); }
+
+  function decodeWord(hex, wordIndex) {
+    const start = 2 + wordIndex * 64;
+    return hex.slice(start, start + 64);
+  }
+
+  function decodeUint(hex, wordIndex) {
+    return BigInt("0x" + decodeWord(hex, wordIndex));
+  }
+
+  function decodeBool(hex, wordIndex) { return decodeUint(hex, wordIndex) !== 0n; }
+
+  function decodeInt(hex, wordIndex) {
+    const u = decodeUint(hex, wordIndex);
+    const TWO_255 = 1n << 255n;
+    const TWO_256 = 1n << 256n;
+    return u >= TWO_255 ? (u - TWO_256) : u;
+  }
+
+  function decodeAddressFromCall(hex) {
+    // return last 20 bytes
+    return "0x" + hex.slice(-40);
+  }
+
+  function fmt(x, digits=6) {
+    if (x === null || x === undefined || Number.isNaN(x)) return "-";
+    return x.toLocaleString(undefined, { maximumFractionDigits: digits });
+  }
+
+  function pctChange(from, to) {
+    if (!Number.isFinite(from) || !Number.isFinite(to) || from === 0) return null;
+    return ((to - from) / from) * 100;
+  }
+
+  function weiToEth(weiBig) {
+    const s = weiBig.toString();
+    if (s.length <= 18) {
+      const frac = s.padStart(18, "0").replace(/0+$/, "");
+      return "0." + (frac === "" ? "0" : frac.slice(0, 8));
+    }
+    const intPart = s.slice(0, s.length - 18);
+    const fracPart = s.slice(s.length - 18).replace(/0+$/, "").slice(0, 8);
+    return intPart + (fracPart ? "." + fracPart : "");
+  }
+
+  function formatTokenAmount(bi, decimals) {
+    const negative = bi < 0n;
+    const x = negative ? -bi : bi;
+    const base = 10n ** BigInt(decimals);
+    const whole = x / base;
+    const fraction = (x % base).toString().padStart(decimals, "0").replace(/0+$/, "");
+    return (negative ? "-" : "") + whole.toString() + (fraction ? "." + fraction : "");
+  }
+
+  function toFloatFromBigInt(bi, decimals) {
+    // Charts use approximate JavaScript Numbers; exact raw-unit amounts are shown in the runs table.
+    return Number(formatTokenAmount(bi, decimals));
+  }
+
+  // ============================================================
+  // RPC calls
+  // ============================================================
+  async function rpc(method, params) {
+    mustEth();
+    return await ethereum.request({ method, params });
+  }
+
+  async function ethCall(to, data, blockTag = "latest") {
+    return await rpc("eth_call", [{ to, data }, blockTag]);
+  }
+
+  async function ensureEthereum() {
+    chainId = (await rpc("eth_chainId", [])).toLowerCase();
+    chainEl.textContent = chainId + (chainId === ETHEREUM_CHAIN_ID_HEX ? " (Ethereum Mainnet OK)" : " (NOT Ethereum Mainnet)");
+    if (chainId !== ETHEREUM_CHAIN_ID_HEX) throw new Error("Switch the wallet to Ethereum Mainnet (chain ID 1).");
+  }
+
+  async function connect() {
+    const accounts = await rpc("eth_requestAccounts", []);
+    currentAccount = accounts && accounts[0] ? accounts[0] : null;
+    if (!currentAccount) throw new Error("No account selected.");
+    walletEl.textContent = currentAccount;
+    await ensureEthereum();
+    if (!userEl.value) userEl.value = currentAccount;
+    log("Connected.");
+  }
+
+  async function validateGnewContract(runner, token1, token2) {
+    if (token1 !== EXPECTED_PAXG || token2 !== EXPECTED_XAUT) {
+      throw new Error("Gnew token addresses must be PAXG (token1) and XAUt (token2).");
+    }
+    const [t1, t2, pool] = await Promise.all([
+      ethCall(runner, SEL_TOKEN1), ethCall(runner, SEL_TOKEN2), ethCall(runner, SEL_POOL)
+    ]);
+    if (decodeAddressFromCall(t1).toLowerCase() !== EXPECTED_PAXG ||
+        decodeAddressFromCall(t2).toLowerCase() !== EXPECTED_XAUT ||
+        decodeAddressFromCall(pool).toLowerCase() !== EXPECTED_POOL) {
+      throw new Error("Contract token1/token2/pool do not match the expected Gnew configuration.");
+    }
+  }
+
+  async function loadInfo() {
+    await ensureEthereum();
+    const runner = normAddr(runnerEl.value);
+    await validateGnewContract(runner, normAddr(token1El.value), normAddr(token2El.value));
+    const owner = decodeAddressFromCall(await ethCall(runner, SEL_OWNER));
+    const op = decodeAddressFromCall(await ethCall(runner, SEL_OPERATOR));
+
+    ownerEl.textContent = owner;
+    operatorEl.textContent = op;
+
+    if (currentAccount) {
+      const ok = op.toLowerCase() === currentAccount.toLowerCase();
+      opCheckEl.innerHTML = ok ? `<span class="pill ok">YOU ARE OPERATOR</span>` : `<span class="pill bad">NOT OPERATOR</span>`;
+    } else {
+      opCheckEl.textContent = "-";
+    }
+
+    log("Loaded owner/operator.");
+  }
+
+  async function readDecimals(token) {
+    const res = await ethCall(token, SEL_DECIMALS);
+    return Number(hexToBigInt(res));
+  }
+
+  async function readBalance(token, user, blockTag = "latest") {
+    const res = await ethCall(token, encodeBalanceOf(user), blockTag);
+    return hexToBigInt(res);
+  }
+
+  async function getBlockNumber() {
+    const hex = await rpc("eth_blockNumber", []);
+    return Number(BigInt(hex));
+  }
+
+  async function getBlockByNumber(blockNumber) {
+    // returns timestamp, etc
+    const b = await rpc("eth_getBlockByNumber", [toHexQty(blockNumber), false]);
+    return b; // timestamp is hex string
+  }
+
+  async function getReceipt(txHash) {
+    return await rpc("eth_getTransactionReceipt", [txHash]);
+  }
+
+  // ============================================================
+  // Charts (Canvas, no external libs)
+  // ============================================================
+  function resizeCanvasToCSS(canvas) {
+    const rect = canvas.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+    const w = Math.max(320, Math.floor(rect.width * dpr));
+    const h = Math.max(220, Math.floor(rect.height * dpr));
+    if (canvas.width !== w || canvas.height !== h) {
+      canvas.width = w;
+      canvas.height = h;
+    }
+  }
+
+  // Auto-zoom bounds: keep padding small (do not blow up with huge balances)
+  function niceBounds(values) {
+    let min = Infinity, max = -Infinity;
+    for (const v of values) {
+      if (v === null || v === undefined || Number.isNaN(v)) continue;
+      min = Math.min(min, v);
+      max = Math.max(max, v);
+    }
+    if (!Number.isFinite(min) || !Number.isFinite(max)) return { min: 0, max: 1 };
+
+    const range = max - min;
+    let pad;
+    if (range === 0) {
+      // if flat, create a small window around it
+      const ref = Math.abs(min) > 0 ? Math.abs(min) : 1;
+      pad = Math.max(ref * 0.01, 0.01);
+    } else {
+      // keep pad tied to range so tiny variations stay visible
+      pad = range * 0.10;
+    }
+    return { min: min - pad, max: max + pad };
+  }
+
+  function drawLineChart(canvas, seriesList, yFixed=6) {
+    resizeCanvasToCSS(canvas);
+    const ctx = canvas.getContext("2d");
+    const W = canvas.width, H = canvas.height;
+    ctx.clearRect(0, 0, W, H);
+
+    const pad = { l: 62, r: 18, t: 16, b: 36 };
+    const plotW = W - pad.l - pad.r;
+    const plotH = H - pad.t - pad.b;
+
+    // x domain
+    const xs = [];
+    for (const s of seriesList) for (const p of s.points) xs.push(p.x);
+    xs.sort((a,b) => a-b);
+    const xMin = xs.length ? xs[0] : 0;
+    const xMax = xs.length ? xs[xs.length - 1] : 1;
+
+    // y domain
+    const ys = [];
+    for (const s of seriesList) for (const p of s.points) ys.push(p.y);
+    const { min: yMin, max: yMax } = niceBounds(ys);
+
+    const xToPx = (x) => pad.l + (xMax === xMin ? plotW/2 : (x - xMin) / (xMax - xMin) * plotW);
+    const yToPx = (y) => pad.t + (yMax === yMin ? plotH/2 : (1 - (y - yMin) / (yMax - yMin)) * plotH);
+
+    // grid
+    ctx.strokeStyle = "#eee";
+    ctx.lineWidth = 1;
+    const gridY = 5;
+    for (let i=0;i<=gridY;i++){
+      const y = pad.t + (i/gridY)*plotH;
+      ctx.beginPath(); ctx.moveTo(pad.l, y); ctx.lineTo(pad.l+plotW, y); ctx.stroke();
+    }
+
+    // axes
+    ctx.strokeStyle = "#bbb";
+    ctx.beginPath();
+    ctx.moveTo(pad.l, pad.t);
+    ctx.lineTo(pad.l, pad.t + plotH);
+    ctx.lineTo(pad.l + plotW, pad.t + plotH);
+    ctx.stroke();
+
+    // y labels
+    ctx.fillStyle = "#666";
+    ctx.font = "12px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, monospace";
+    for (let i=0;i<=gridY;i++){
+      const v = yMax - (i/gridY)*(yMax-yMin);
+      const y = pad.t + (i/gridY)*plotH;
+      ctx.fillText(v.toFixed(yFixed), 6, y+4);
+    }
+
+    // x labels
+    const gridX = 3;
+    for (let i=0;i<=gridX;i++){
+      const x = xMin + (i/gridX)*(xMax-xMin);
+      const px = xToPx(x);
+      const d = new Date(x);
+      const label = d.toISOString().slice(11, 19);
+      ctx.fillText(label, px-30, pad.t+plotH+22);
+    }
+
+    // lines + points
+    for (const s of seriesList) {
+      ctx.strokeStyle = s.color;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      let started = false;
+      for (const p of s.points) {
+        const x = xToPx(p.x);
+        const y = yToPx(p.y);
+        if (!started) { ctx.moveTo(x,y); started = true; }
+        else ctx.lineTo(x,y);
+      }
+      ctx.stroke();
+
+      ctx.fillStyle = s.color;
+      for (const p of s.points) {
+        const x = xToPx(p.x);
+        const y = yToPx(p.y);
+        ctx.beginPath(); ctx.arc(x,y,3,0,Math.PI*2); ctx.fill();
+      }
+    }
+
+    // legend
+    const lx = pad.l + 6, ly = pad.t + 6;
+    ctx.font = "13px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial";
+    let off = 0;
+    for (const s of seriesList) {
+      ctx.fillStyle = s.color;
+      ctx.fillRect(lx + off, ly, 10, 10);
+      ctx.fillStyle = "#111";
+      ctx.fillText(s.name, lx + off + 14, ly + 10);
+      off += ctx.measureText(s.name).width + 36;
+    }
+  }
+
+  function drawBarChart(canvas, labels, values) {
+    resizeCanvasToCSS(canvas);
+    const ctx = canvas.getContext("2d");
+    const W = canvas.width, H = canvas.height;
+    ctx.clearRect(0, 0, W, H);
+
+    const pad = { l: 62, r: 18, t: 16, b: 50 };
+    const plotW = W - pad.l - pad.r;
+    const plotH = H - pad.t - pad.b;
+
+    const maxV = Math.max(1, ...values);
+    const yMin = 0, yMax = maxV * 1.1;
+
+    const yToPx = (y) => pad.t + (1 - (y - yMin) / (yMax - yMin)) * plotH;
+
+    // grid
+    ctx.strokeStyle = "#eee";
+    const gridY = 5;
+    for (let i=0;i<=gridY;i++){
+      const y = pad.t + (i/gridY)*plotH;
+      ctx.beginPath(); ctx.moveTo(pad.l, y); ctx.lineTo(pad.l+plotW, y); ctx.stroke();
+    }
+
+    // axes
+    ctx.strokeStyle = "#bbb";
+    ctx.beginPath();
+    ctx.moveTo(pad.l, pad.t);
+    ctx.lineTo(pad.l, pad.t + plotH);
+    ctx.lineTo(pad.l + plotW, pad.t + plotH);
+    ctx.stroke();
+
+    // y labels
+    ctx.fillStyle = "#666";
+    ctx.font = "12px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, monospace";
+    for (let i=0;i<=gridY;i++){
+      const v = yMax - (i/gridY)*(yMax-yMin);
+      const y = pad.t + (i/gridY)*plotH;
+      ctx.fillText(v.toFixed(0), 6, y+4);
+    }
+
+    const n = labels.length || 1;
+    const barW = Math.max(8, Math.floor(plotW / (n * 1.6)));
+    const gap = Math.floor((plotW - n*barW) / Math.max(1, n-1));
+
+    for (let i=0;i<n;i++){
+      const x = pad.l + i*(barW+gap);
+      const y = yToPx(values[i]);
+      const h = (pad.t + plotH) - y;
+      ctx.fillStyle = "#ff7a00";
+      ctx.fillRect(x, y, barW, h);
+
+      // label
+      ctx.save();
+      ctx.translate(x + barW/2, pad.t + plotH + 10);
+      ctx.rotate(-Math.PI/6);
+      ctx.fillStyle = "#333";
+      ctx.font = "12px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, monospace";
+      const txt = labels[i];
+      ctx.fillText(txt.length > 20 ? (txt.slice(0,20)+"…") : txt, -52, 12);
+      ctx.restore();
+    }
+  }
+
+  // ============================================================
+  // Parsing logs for our events
+  // ============================================================
+  function parseRunLog(log) {
+    const topic0 = (log.topics && log.topics[0] || "").toLowerCase();
+    const data = log.data || "0x";
+
+    if (topic0 === TOPIC_RUN_NOSWAP) {
+      const isEqualizePhase = decodeBool(data, 0);
+      const reason = Number(decodeUint(data, 1));
+      const reasonName = NoSwapReasonNames[reason] || ("reason#" + reason);
+
+      // (optional fields)
+      const P_now = decodeUint(data, 2);
+      const P_prev = decodeUint(data, 3);
+      const delta = decodeInt(data, 4);
+      const baseSell = decodeUint(data, 5);
+      const eqBalUsed = decodeUint(data, 6);
+      const amountIn = decodeUint(data, 7);
+
+      return {
+        type: "NOSWAP",
+        isEqualizePhase,
+        reason,
+        reasonName,
+        P_now, P_prev, delta, baseSell, eqBalUsed, amountIn,
+      };
+    }
+
+    if (topic0 === TOPIC_RUN_SWAPOK) {
+      const isEqualizePhase = decodeBool(data, 0);
+      const soldToken1 = decodeBool(data, 1);
+
+      const P_now = decodeUint(data, 2);
+      const P_prev = decodeUint(data, 3);
+      const delta = decodeInt(data, 4);
+
+      const amountIn = decodeUint(data, 5);
+      const amountOut = decodeUint(data, 6);
+
+      return {
+        type: "OK",
+        isEqualizePhase,
+        soldToken1,
+        P_now, P_prev, delta,
+        amountIn, amountOut
+      };
+    }
+
+    if (topic0 === TOPIC_RUN_SWAPFAIL) {
+      const isEqualizePhase = decodeBool(data, 0);
+      return {
+        type: "FAIL",
+        isEqualizePhase
+      };
+    }
+
+    return null;
+  }
+
+  // ============================================================
+  // History loader (eth_getLogs, chunked)
+  // ============================================================
+  async function loadAllHistory() {
+    setProgress(0, "validating inputs...");
+    modeEl.textContent = "-";
+    modeNoteEl.textContent = "-";
+    runsFoundEl.textContent = "-";
+    rangeInfoEl.textContent = "-";
+    tbody.innerHTML = "";
+
+    const runner = normAddr(runnerEl.value);
+    const token1 = normAddr(token1El.value);
+    const token2 = normAddr(token2El.value);
+
+    const fromBlockRaw = fromBlockEl.value.trim();
+    if (!/^\d+$/.test(fromBlockRaw)) throw new Error("Enter the Gnew contract deployment block before scanning.");
+    const fromBlock = Number(fromBlockRaw);
+    if (!Number.isSafeInteger(fromBlock) || fromBlock <= 0) throw new Error("From Block must be a positive deployment block number.");
+
+    let chunk = Number(chunkSizeEl.value.trim());
+    if (!Number.isFinite(chunk) || chunk < 500) chunk = 50000;
+
+    if (!currentAccount) await connect();
+    await ensureEthereum();
+    if (!userEl.value.trim()) userEl.value = currentAccount;
+    const user = normAddr(userEl.value);
+    await validateGnewContract(runner, token1, token2);
+
+    // Read token decimals
+    setProgress(1, "reading token decimals...");
+    const [dec1, dec2] = await Promise.all([readDecimals(token1), readDecimals(token2)]);
+    if (dec1 !== 18 || dec2 !== 6) throw new Error("Unexpected decimals: PAXG must be 18 and XAUt must be 6.");
+
+    // Determine latest block
+    setProgress(2, "getting latest block...");
+    const latestBlock = await getBlockNumber();
+    if (fromBlock > latestBlock) throw new Error("Deployment block cannot exceed the latest Ethereum block.");
+
+    // Fetch logs for runner+user+our topics, chunked
+    setProgress(3, "scanning logs (eth_getLogs)...");
+    const topicUser = topicForAddress(user);
+
+    const topics = [
+      [TOPIC_RUN_NOSWAP, TOPIC_RUN_SWAPOK, TOPIC_RUN_SWAPFAIL],
+      topicUser
+    ];
+
+    const allLogs = [];
+    let start = fromBlock;
+    let scanned = 0;
+    const total = Math.max(1, latestBlock - fromBlock + 1);
+
+    // adaptive chunking: if RPC errors, reduce chunk size and retry
+    while (start <= latestBlock) {
+      let end = Math.min(latestBlock, start + chunk - 1);
+
+      try {
+        const res = await rpc("eth_getLogs", [{
+          address: runner,
+          fromBlock: toHexQty(start),
+          toBlock: toHexQty(end),
+          topics
+        }]);
+
+        for (const l of res) allLogs.push(l);
+
+        scanned += (end - start + 1);
+        const pct = 3 + (scanned / total) * 35; // up to 38%
+        setProgress(pct, `scanned blocks ${start} → ${end} (chunk=${chunk}), logs=${allLogs.length}`);
+        start = end + 1;
+
+      } catch (e) {
+        // reduce chunk and retry
+        const msg = (e && (e.message || e.toString())) || "";
+        if (chunk <= 1000) {
+          throw new Error("eth_getLogs failed even with small chunk. RPC may not allow this range. " + msg);
+        }
+        chunk = Math.max(1000, Math.floor(chunk / 2));
+        setProgress(3 + (scanned / total) * 35, `RPC limited. Reducing chunk to ${chunk} and retrying...`);
+      }
+    }
+
+    // Sort logs
+    allLogs.sort((a,b) => {
+      const ba = Number(BigInt(a.blockNumber));
+      const bb = Number(BigInt(b.blockNumber));
+      if (ba !== bb) return ba - bb;
+      const la = Number(BigInt(a.logIndex));
+      const lb = Number(BigInt(b.logIndex));
+      return la - lb;
+    });
+
+    // Parse logs into run entries
+    setProgress(40, "parsing logs...");
+    const entries = [];
+    for (const l of allLogs) {
+      const parsed = parseRunLog(l);
+      if (!parsed) continue;
+
+      entries.push({
+        txHash: l.transactionHash,
+        blockNumber: Number(BigInt(l.blockNumber)),
+        logIndex: Number(BigInt(l.logIndex)),
+        ...parsed
+      });
+    }
+
+    // Find first successful equalize    const firstEqIdx = entries.findIndex(e => e.type === "OK" && e.isEqualizePhase === true);
+    if (firstEqIdx === -1) {
+      setProgress(100, "done");
+      modeEl.innerHTML = `<span class="pill bad">NO EQUALIZE FOUND</span>`;
+      modeNoteEl.textContent = "No RunSwapOk with isEqualizePhase=true was found for this user. Check From Block / addresses.";
+      runsFoundEl.textContent = "0";
+      rangeInfoEl.textContent = `scanned ${fromBlock} → ${latestBlock}`;
+      log("No successful Equalize found for this user in scanned range.");
+      return;
+    }
+
+    const filtered = entries.slice(firstEqIdx); // from first equalize to latest run
+    runsFoundEl.textContent = String(filtered.length);
+    rangeInfoEl.textContent = `firstEqualizeBlock=${filtered[0].blockNumber} | scanned ${fromBlock} → ${latestBlock}`;
+
+    // Build unique block list to fetch timestamps
+    setProgress(45, "loading block timestamps...");
+    const blockTsCache = new Map();
+    const uniqBlocks = Array.from(new Set(filtered.map(e => e.blockNumber))).sort((a,b)=>a-b);
+
+    for (let i=0;i<uniqBlocks.length;i++) {
+      const bn = uniqBlocks[i];
+      const blk = await getBlockByNumber(bn);
+      const ts = Number(BigInt(blk.timestamp)) * 1000;
+      blockTsCache.set(bn, ts);
+
+      const pct = 45 + (i/Math.max(1,uniqBlocks.length))*10; // 45-55
+      setProgress(pct, `loaded block timestamps (${i+1}/${uniqBlocks.length})`);
+    }
+
+    // Attach timestamps
+    for (const e of filtered) e.timeMs = blockTsCache.get(e.blockNumber) || null;
+
+    // Load receipts for fees
+    setProgress(56, "loading transaction receipts (gas/fee)...");
+    // Concurrency-limited receipt loader
+    const receiptCache = new Map();
+    const uniqTx = Array.from(new Set(filtered.map(e => e.txHash)));
+
+    const CONCURRENCY = 4;
+    let idx = 0;
+    async function worker() {
+      while (idx < uniqTx.length) {
+        const my = idx++;
+        const h = uniqTx[my];
+        try {
+          const r = await getReceipt(h);
+          receiptCache.set(h, r);
+        } catch {
+          receiptCache.set(h, null);
+        }
+        const pct = 56 + (my/Math.max(1,uniqTx.length))*14; // 56-70
+        setProgress(pct, `receipts loaded (${my+1}/${uniqTx.length})`);
+      }
+    }
+    await Promise.all(Array.from({length: Math.min(CONCURRENCY, uniqTx.length)}, worker));
+
+    function feeInfoFromReceipt(r) {
+      if (!r) return { feeEth: null, gasUsed: null, egpWei: null };
+      const gasUsed = r.gasUsed ? BigInt(r.gasUsed) : 0n;
+      const egp = r.effectiveGasPrice ? BigInt(r.effectiveGasPrice) : (r.gasPrice ? BigInt(r.gasPrice) : 0n);
+      const feeWei = gasUsed * egp;
+      return { feeEth: Number(weiToEth(feeWei)), gasUsed: gasUsed.toString(), egpWei: egp.toString() };
+    }
+
+    for (const e of filtered) {
+      const r = receiptCache.get(e.txHash);
+      const fi = feeInfoFromReceipt(r);
+      e.feeEth = fi.feeEth;
+      e.gasUsed = fi.gasUsed;
+      e.effectiveGasPriceWei = fi.egpWei;
+    }
+
+    // ============================================================
+    // Mode selection: EXACT@BLOCK or SWAP_DELTA
+    // ============================================================
+    // Try EXACT@BLOCK:
+    // - For each run's block, read balanceOf(token1/token2) at that blockNumber.
+    // - If RPC doesn't support historical state (archive), auto-fallback to SWAP_DELTA.
+    setProgress(71, "trying EXACT@BLOCK balance reads...");
+    let mode = "EXACT@BLOCK";
+    let modeNote = "Balances are read at the end of each run's block (requires historical-state RPC). Other transactions in the same block may affect the balance.";
+    const points = []; // {timeMs, paxg, xaut, value, feeEth, entry}; value is nominal token count, NOT USD
+
+    try {
+      // Test earliest block first
+      const testBlock = filtered[0].blockNumber;
+      await readBalance(token1, user, toHexQty(testBlock)); // if this fails => likely non-archive
+      await readBalance(token2, user, toHexQty(testBlock));
+
+      for (let i=0;i<filtered.length;i++) {
+        const e = filtered[i];
+        const tag = toHexQty(e.blockNumber);
+        const [b1, b2] = await Promise.all([
+          readBalance(token1, user, tag),
+          readBalance(token2, user, tag)
+        ]);
+        const paxg = toFloatFromBigInt(b1, dec1);
+        const xaut = toFloatFromBigInt(b2, dec2);
+        const value = paxg + xaut;
+
+        points.push({
+          timeMs: e.timeMs,
+          paxg, xaut, value,
+          feeEth: e.feeEth,
+          entry: e
+        });
+
+        const pct = 71 + (i/Math.max(1,filtered.length))*14; // 71-85
+        setProgress(pct, `EXACT@BLOCK balances (${i+1}/${filtered.length})`);
+      }
+    } catch (e) {
+      mode = "SWAP_DELTA";
+      modeNote =
+        "Your RPC did NOT support exact historical balances for older blocks. " +
+        "Fallback mode reconstructs balances from RunSwapOk amountIn/amountOut deltas, seeded from current balances. " +
+        "Accurate only if the user wallet did not do external transfers between runs.";
+
+      setProgress(72, "EXACT@BLOCK failed — switching to SWAP_DELTA reconstruction...");
+
+      // Seed with current balances (latest)
+      const [cur1, cur2] = await Promise.all([
+        readBalance(token1, user, "latest"),
+        readBalance(token2, user, "latest"),
+      ]);
+
+      // Reconstruct balances at each run by walking backwards:
+      let b1 = cur1;
+      let b2 = cur2;
+
+      // We want balance AFTER each run in chronological order.
+      // We'll compute in reverse: at entry i (reverse), "after run" is current (b1,b2),
+      // then undo that run to get previous.
+      const reversePoints = new Array(filtered.length);
+
+      for (let ri = filtered.length - 1; ri >= 0; ri--) {
+        const eRun = filtered[ri];
+
+        // balance after this run
+        reversePoints[ri] = {
+          timeMs: eRun.timeMs,
+          b1Raw: b1,
+          b2Raw: b2,
+          feeEth: eRun.feeEth,
+          entry: eRun
+        };
+
+        // undo if success swap
+        if (eRun.type === "OK") {
+          const amountIn = eRun.amountIn || 0n;
+          const amountOut = eRun.amountOut || 0n;
+
+          // soldToken1 meaning: token1 decreased by amountIn, token2 increased by amountOut
+          if (eRun.soldToken1) {
+            b1 = b1 + amountIn;
+            b2 = b2 - amountOut;
+          } else {
+            // sold token2: token2 decreased by amountIn, token1 increased by amountOut
+            b2 = b2 + amountIn;
+            b1 = b1 - amountOut;
+          }
+        }
+      }
+
+      // Convert to floats
+      for (let i=0;i<reversePoints.length;i++) {
+        const rp = reversePoints[i];
+        const paxg = toFloatFromBigInt(rp.b1Raw, dec1);
+        const xaut = toFloatFromBigInt(rp.b2Raw, dec2);
+        const value = paxg + xaut;
+        points.push({
+          timeMs: rp.timeMs,
+          paxg, xaut, value,
+          feeEth: rp.feeEth,
+          entry: rp.entry
+        });
+
+        const pct = 72 + (i/Math.max(1,reversePoints.length))*13; // 72-85
+        setProgress(pct, `SWAP_DELTA reconstruction (${i+1}/${reversePoints.length})`);
+      }
+    }
+
+    // Update mode UI
+    modeEl.innerHTML = mode === "EXACT@BLOCK"
+      ? `<span class="pill ok">EXACT@BLOCK</span>`
+      : `<span class="pill bad">SWAP_DELTA</span>`;
+    modeNoteEl.textContent = modeNote;
+
+    // ============================================================
+    // Compute stats & percent changes (baseline = first Equalize point)
+    // ============================================================
+    setProgress(86, "computing stats...");
+    const base = points[0]; // this is the first equalize run's block snapshot (or reconstructed)
+    const last = points[points.length - 1];
+
+    const dPaxg = last.paxg - base.paxg;
+    const dXaut = last.xaut - base.xaut;
+    const dVal  = last.value - base.value;
+
+    paxgDeltaEl.textContent = fmt(dPaxg, 12);
+    xautDeltaEl.textContent = fmt(dXaut, 6);
+    valDeltaEl.textContent  = fmt(dVal, 6);
+    valLastEl.textContent   = fmt(last.value, 6);
+
+    const pPaxg = pctChange(base.paxg, last.paxg);
+    const pXaut = pctChange(base.xaut, last.xaut);
+    const pVal  = pctChange(base.value, last.value);
+
+    paxgPctEl.textContent = pPaxg === null ? "Δ%: -" : `Δ%: ${fmt(pPaxg, 2)}%`;
+    xautPctEl.textContent = pXaut === null ? "Δ%: -" : `Δ%: ${fmt(pXaut, 2)}%`;
+    valPctEl.textContent  = pVal  === null ? "Δ%: -" : `Δ%: ${fmt(pVal, 2)}%`;
+
+    // ============================================================
+    // Top NoSwap Reasons (from events, from first equalize onward)
+    // ============================================================
+    const reasonCounts = {};
+    for (const e of filtered) {
+      if (e.type !== "NOSWAP") continue;
+      const name = e.reasonName || ("reason#" + e.reason);
+      reasonCounts[name] = (reasonCounts[name] || 0) + 1;
+    }
+    const reasonItems = Object.entries(reasonCounts)
+      .sort((a,b) => b[1]-a[1])
+      .slice(0, 8);
+
+    // ============================================================
+    // Render charts
+    // ============================================================
+    setProgress(90, "rendering charts...");
+    const balSeries = [
+      { name: "PAXG", color: "#1f77b4", points: points.map(p => ({ x: p.timeMs, y: p.paxg })) },
+      { name: "XAUt", color: "#2ca02c", points: points.map(p => ({ x: p.timeMs, y: p.xaut })) },
+    ];
+    drawLineChart(cBalances, balSeries, 6);
+
+    drawLineChart(cValue, [
+      { name: "Nominal PAXG+XAUt", color: "#ff7a00", points: points.map(p => ({ x: p.timeMs, y: p.value })) }
+    ], 6);
+
+    const reasonLabels = reasonItems.length ? reasonItems.map(x => x[0]) : ["No NoSwap"];
+    const reasonVals = reasonItems.length ? reasonItems.map(x => x[1]) : [0];
+    drawBarChart(cReasons, reasonLabels, reasonVals);
+
+    const feePts = points
+      .filter(p => Number.isFinite(p.feeEth))
+      .map(p => ({ x: p.timeMs, y: p.feeEth }));
+    drawLineChart(cFees, [
+      { name: "Fee (ETH)", color: "#9467bd", points: feePts }
+    ], 8);
+
+    // ============================================================
+    // Render table
+    // ============================================================
+    setProgress(94, "rendering table...");
+    tbody.innerHTML = "";
+    const explorerBase = "https://etherscan.io/tx/";
+
+    function shortHash(h) { return h ? (h.slice(0, 10) + "…" + h.slice(-8)) : "-"; }
+
+    for (let i=0;i<filtered.length;i++) {
+      const e = filtered[i];
+      const when = e.timeMs ? new Date(e.timeMs).toISOString().replace("T"," ").slice(0,19) : "-";
+      const phase = e.isEqualizePhase ? "Equalize" : "Delta";
+
+      let detail = "";
+      if (e.type === "NOSWAP") {
+        detail = `reason=${e.reasonName}`;
+      } else if (e.type === "OK") {
+        const sold = e.soldToken1 ? "PAXG" : "XAUt";
+        const bought = e.soldToken1 ? "XAUt" : "PAXG";
+        const soldDecimals = e.soldToken1 ? dec1 : dec2;
+        const boughtDecimals = e.soldToken1 ? dec2 : dec1;
+        detail = `requested ${formatTokenAmount(e.amountIn, soldDecimals)} ${sold} | output ${formatTokenAmount(e.amountOut, boughtDecimals)} ${bought}`;
+      } else {
+        detail = "swap reverted (caught)";
+      }
+
+      const fee = Number.isFinite(e.feeEth) ? e.feeEth.toFixed(8) : "-";
+      const tx = e.txHash || "-";
+
+      const tr = document.createElement("tr");
+      const cells = [
+        String(i+1),
+        when,
+        String(e.blockNumber),
+        e.type,
+        phase,
+        detail,
+        fee,
+        shortHash(tx),
+      ];
+      for (let ci=0; ci<cells.length; ci++) {
+        const td = document.createElement("td");
+        if (ci === 7 && tx !== "-") {
+          const a = document.createElement("a");
+          a.href = explorerBase + tx;
+          a.target = "_blank";
+          a.rel = "noreferrer";
+          a.textContent = cells[ci];
+          td.appendChild(a);
+        } else {
+          td.textContent = cells[ci];
+        }
+        tr.appendChild(td);
+      }
+      tbody.appendChild(tr);
+    }
+
+    setProgress(100, "done");
+    log(`Loaded history: ${filtered.length} runs from first Equalize block=${filtered[0].blockNumber}. Mode=${mode}.`);
+  }
+
+  // ============================================================
+  // Wire buttons
+  // ============================================================
+  document.getElementById("connect").onclick = async () => {
+    try { await connect(); } catch (e) { log("ERROR: " + (e?.message || e)); }
+  };
+
+  document.getElementById("loadInfo").onclick = async () => {
+    try { await loadInfo(); } catch (e) { log("ERROR: " + (e?.message || e)); }
+  };
+
+  document.getElementById("loadHistory").onclick = async () => {
+    try {
+      setProgress(0, "starting...");
+      await loadAllHistory();
+    } catch (e) {
+      setProgress(0, "failed");
+      log("ERROR: " + (e?.message || e));
+      modeEl.innerHTML = `<span class="pill bad">ERROR</span>`;
+      modeNoteEl.textContent = (e?.message || String(e));
+    }
+  };
+
+  // auto re-render on resize
+  window.addEventListener("resize", () => {
+    // charts are redrawn on load; if you want live resize, reload history
+  });
+
+  // provider events
+  if (window.ethereum?.on) {
+    window.ethereum.on("accountsChanged", (accs) => {
+      currentAccount = accs && accs[0] ? accs[0] : null;
+      walletEl.textContent = currentAccount || "not connected";
+      log("accountsChanged");
+    });
+    window.ethereum.on("chainChanged", (cid) => {
+      chainId = cid;
+      chainEl.textContent = chainId + (chainId === ETHEREUM_CHAIN_ID_HEX ? " (Ethereum Mainnet OK)" : " (NOT Ethereum Mainnet)");
+      log("chainChanged: " + cid);
+    });
+  }
+
+  log("Ready. Connect → Load Owner/Operator → Load Full History");
+})();
+</script>
+</body>
+</html>

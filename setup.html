@@ -28,11 +28,11 @@
 <body>
   <h2>Gnew — Setup</h2>
   <div class="muted">No external libraries. Requires an EIP-1193 compatible wallet. Network: Ethereum Mainnet.</div>
-  <p class="warn">PRE-DEPLOYMENT: No Gnew contract address is configured. Approval and trading transactions are blocked until a verified Gnew contract is supplied.</p>
+  <p class="warn">LIVE ETHEREUM MAINNET: Approvals and operator runs can move real PAXG/XAUt. Confirm the contract and wallet before signing.</p>
 
   <div class="box">
-    <label>Gnew Contract Address (after deployment)</label>
-    <input id="contract" value="" placeholder="Enter the deployed Gnew contract address (0x...)" autocomplete="off">
+    <label>Gnew Contract Address (Ethereum Mainnet)</label>
+    <input id="contract" value="0x22327bd71f063f05f478dc90ba4fd939200dc5bc" placeholder="Deployed Gnew contract address (0x...)" autocomplete="off">
 
     <div class="row">
       <div>
@@ -152,6 +152,7 @@
   const SEL_TOKEN1         = "0xd21220a7"; // token1()
   const SEL_TOKEN2         = "0x25be124e"; // token2()
 
+  const EXPECTED_CONTRACT = "0x22327bd71f063f05f478dc90ba4fd939200dc5bc";
   const ETHEREUM_CHAIN_ID_HEX = "0x1"; // Ethereum Mainnet (chain ID 1)
   const EXPECTED_PAXG = "0x45804880De22913dAFE09f4980848ECE6EcbAf78".toLowerCase();
   const EXPECTED_XAUT = "0x68749665FF8D2d112Fa859AA293F07A622782F38".toLowerCase();
@@ -293,6 +294,7 @@
   async function assertGnewContract() {
     await requireEthereumMainnet();
     const c = normAddr(contractIn.value);
+    if (c.toLowerCase() !== EXPECTED_CONTRACT) throw new Error("Unexpected Gnew contract address. Restore the deployed Ethereum contract address.");
     const code = await ethereum.request({ method: "eth_getCode", params: [c, "latest"] });
     if (!code || code === "0x") throw new Error("No deployed contract at this address on Ethereum Mainnet.");
     const [paxg, xaut, pool] = await Promise.all([

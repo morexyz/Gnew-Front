@@ -208,7 +208,7 @@
     </div>
   </div>
 
-  <p class="muted">Data source: public Ethereum RPC (SolidRPC). This page uses only read operations. Public endpoints may rate-limit or omit historical results; verify important activity independently on Etherscan.</p>
+  <p class="muted">Data source: dedicated Ethereum RPC (Infura). This page uses only read operations. Public endpoints may rate-limit or omit historical results; verify important activity independently on Etherscan.</p>
   <div class="box">
     <label>Log</label>
     <pre id="log">[ready] Connect → Load Owner/Operator → Load Full History\n</pre>
@@ -299,7 +299,7 @@
   // ============================================================
   // Public, read-only Ethereum RPC. No visitor wallet connection or embedded API keys.
   // ============================================================
-  const PUBLIC_RPC_URL = "https://rpc.solidrpc.io/public/evm/1";
+  const PUBLIC_RPC_URL = "https://mainnet.infura.io/v3/6a3574fcfe2d4f8e8620254fcd5103a7";
   let chainId = null;
   let nextRpcAt = 0;
 

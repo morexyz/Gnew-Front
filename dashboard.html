@@ -42,13 +42,13 @@
     Requires an EIP-1193 wallet. Network: Ethereum Mainnet.
   </div>
 
-  <p class="warn">PRE-DEPLOYMENT: Enter the deployed and verified Gnew contract address and its deployment block before loading history. This dashboard is read-only.</p>
+  <p class="warn">LIVE ETHEREUM MAINNET: This dashboard is read-only. Confirm the Gnew contract and network before loading history.</p>
 
   <div class="box">
     <div class="row">
       <div class="col">
-        <label>Gnew Contract Address (after deployment)</label>
-        <input id="runner" value="" placeholder="Verified deployed Gnew contract (0x...)" autocomplete="off" />
+        <label>Gnew Contract Address (Ethereum Mainnet)</label>
+        <input id="runner" value="0x22327bd71f063f05f478dc90ba4fd939200dc5bc" placeholder="Verified deployed Gnew contract (0x...)" autocomplete="off" />
       </div>
       <div class="col">
         <label>User Address (portfolio wallet)</label>
@@ -70,7 +70,7 @@
     <div class="row">
       <div class="col">
         <label>From Block (scan start)</label>
-        <input id="fromBlock" value="" placeholder="Gnew contract deployment block" />
+        <input id="fromBlock" value="26334656" placeholder="Gnew contract deployment block" />
         <div class="small">Required: deployment block of the verified Gnew contract (avoid scanning Ethereum from genesis).</div>
       </div>
       <div class="col">
@@ -212,6 +212,7 @@
   // Constants
   // ============================================================
   const ETHEREUM_CHAIN_ID_HEX = "0x1";
+  const EXPECTED_CONTRACT = "0x22327bd71f063f05f478dc90ba4fd939200dc5bc";
   const EXPECTED_PAXG = "0x45804880De22913dAFE09f4980848ECE6EcbAf78".toLowerCase();
   const EXPECTED_XAUT = "0x68749665FF8D2d112Fa859AA293F07A622782F38".toLowerCase();
   const EXPECTED_POOL = "0xc756BBA710d45647715079cE50aa16aab36deD42".toLowerCase();
@@ -425,6 +426,7 @@
   }
 
   async function validateGnewContract(runner, token1, token2) {
+    if (runner !== EXPECTED_CONTRACT) throw new Error("Unexpected Gnew contract address. Restore the deployed Ethereum contract address.");
     if (token1 !== EXPECTED_PAXG || token2 !== EXPECTED_XAUT) {
       throw new Error("Gnew token addresses must be PAXG (token1) and XAUt (token2).");
     }
@@ -847,7 +849,8 @@
       });
     }
 
-    // Find first successful equalize    const firstEqIdx = entries.findIndex(e => e.type === "OK" && e.isEqualizePhase === true);
+    // Find first successful equalize
+    const firstEqIdx = entries.findIndex(e => e.type === "OK" && e.isEqualizePhase === true);
     if (firstEqIdx === -1) {
       setProgress(100, "done");
       modeEl.innerHTML = `<span class="pill bad">NO EQUALIZE FOUND</span>`;

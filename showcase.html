@@ -39,10 +39,10 @@
   <h2>Gnew — Live Showcase</h2>
   <div class="muted">
     Pure on-chain history via <code>eth_getLogs</code>. No external libraries. IPFS-friendly.
-    Public, read-only reference wallet. No MetaMask or wallet connection required. Network: Ethereum Mainnet.
+    Public reference wallet; no MetaMask or wallet connection required. Network: Ethereum Mainnet.
   </div>
 
-  <p class="warn">LIVE ETHEREUM MAINNET — VIEW ONLY. All balances and transactions are independently verifiable. No performance or profit claims are implied.</p>
+  <p class="warn">LIVE ETHEREUM MAINNET: This dashboard is read-only. Confirm the Gnew contract and network before loading history.</p>
 
   <div class="box">
     <div class="row">
@@ -51,7 +51,7 @@
         <input id="runner" value="0x22327bd71f063f05f478dc90ba4fd939200dc5bc" placeholder="Verified deployed Gnew contract (0x...)" autocomplete="off" />
       </div>
       <div class="col">
-        <label>Gnew Reference Wallet (public)</label>
+        <label>Gnew Reference Wallet (portfolio wallet)</label>
         <input id="user" value="0x214253a9239bb198358556340788294d4f73476a" readonly />
       </div>
     </div>
@@ -75,14 +75,14 @@
       </div>
       <div class="col">
         <label>Initial Chunk Size (blocks)</label>
-        <input id="chunkSize" value="2000" />
+        <input id="chunkSize" value="50000" />
         <div class="small">Auto-shrinks if your RPC says “too many results”.</div>
       </div>
     </div>
 
     <div class="row">
       <div class="col">
-        <label>Publicly Viewed Wallet</label>
+        <label>Reference Wallet</label>
         <code id="wallet">0x214253a9239bb198358556340788294d4f73476a</code>
       </div>
       <div class="col">
@@ -91,8 +91,9 @@
       </div>
     </div>
 
-    <button class="secondary" id="loadInfo">Refresh Contract &amp; Balances</button>
-    <button class="primary" id="loadHistory">Reload Public History (first Equalize → latest Run)</button>
+    <button class="secondary" id="connect">1) Check RPC</button>
+    <button class="secondary" id="loadInfo">2) Load Owner/Operator</button>
+    <button class="primary" id="loadHistory">3) Load Full History (from first Equalize → latest Run)</button>
 
     <div style="margin-top:10px;">
       <div class="small">Progress</div>
@@ -101,14 +102,6 @@
     </div>
 
     <div class="cards">
-      <div class="card">
-        <div class="small">Current PAXG balance (on-chain)</div>
-        <div class="big" id="livePaxg">-</div>
-      </div>
-      <div class="card">
-        <div class="small">Current XAUt balance (on-chain)</div>
-        <div class="big" id="liveXaut">-</div>
-      </div>
       <div class="card">
         <div class="small">Mode</div>
         <div class="big" id="mode">-</div>
@@ -208,7 +201,6 @@
     </div>
   </div>
 
-  <p class="muted">Data source: dedicated Ethereum RPC (Infura). This page uses only read operations. Public endpoints may rate-limit or omit historical results; verify important activity independently on Etherscan.</p>
   <div class="box">
     <label>Log</label>
     <pre id="log">[ready] Connect → Load Owner/Operator → Load Full History\n</pre>
@@ -297,11 +289,10 @@
   const cFees = document.getElementById("cFees");
 
   // ============================================================
-  // Public, read-only Ethereum RPC. No visitor wallet connection or embedded API keys.
+  // Browser-visible, read-only Showcase RPC (separate from the operator bot).
   // ============================================================
-  const PUBLIC_RPC_URL = "https://mainnet.infura.io/v3/6a3574fcfe2d4f8e8620254fcd5103a7";
+  const RPC_URL = "https://mainnet.infura.io/v3/6a3574fcfe2d4f8e8620254fcd5103a7";
   let chainId = null;
-  let nextRpcAt = 0;
 
   function log(msg) {
     const t = new Date().toISOString().slice(11, 19);
@@ -404,20 +395,15 @@
   // RPC calls
   // ============================================================
   async function rpc(method, params) {
-    // Public RPC is rate-limited; pace calls without adding third-party dependencies.
-    const now = Date.now();
-    const wait = Math.max(0, nextRpcAt - now);
-    nextRpcAt = Math.max(nextRpcAt, now) + 650;
-    if (wait) await new Promise(resolve => setTimeout(resolve, wait));
-    const response = await fetch(PUBLIC_RPC_URL, {
+    const response = await fetch(RPC_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params })
     });
-    if (!response.ok) throw new Error(`Public RPC HTTP ${response.status}. Retry later.`);
+    if (!response.ok) throw new Error(`RPC HTTP ${response.status}`);
     const data = await response.json();
-    if (data.error) throw new Error(`Public RPC ${method}: ${data.error.message || "request failed"}`);
-    if (!Object.hasOwn(data, "result")) throw new Error(`Public RPC ${method}: missing result`);
+    if (data.error) throw new Error(`RPC ${method}: ${data.error.message || "request failed"}`);
+    if (!("result" in data)) throw new Error(`RPC ${method}: missing result`);
     return data.result;
   }
 
@@ -428,7 +414,12 @@
   async function ensureEthereum() {
     chainId = (await rpc("eth_chainId", [])).toLowerCase();
     chainEl.textContent = chainId + (chainId === ETHEREUM_CHAIN_ID_HEX ? " (Ethereum Mainnet OK)" : " (NOT Ethereum Mainnet)");
-    if (chainId !== ETHEREUM_CHAIN_ID_HEX) throw new Error("Public RPC is not on Ethereum Mainnet (chain ID 1).");
+    if (chainId !== ETHEREUM_CHAIN_ID_HEX) throw new Error("RPC endpoint must use Ethereum Mainnet (chain ID 1).");
+  }
+
+  async function connect() {
+    await ensureEthereum();
+    log("Read-only RPC ready.");
   }
 
   async function validateGnewContract(runner, token1, token2) {
@@ -456,7 +447,7 @@
     ownerEl.textContent = owner;
     operatorEl.textContent = op;
 
-    opCheckEl.textContent = "PUBLIC VIEW ONLY — no wallet connected";
+    opCheckEl.textContent = "PUBLIC VIEW — NO WALLET CONNECTED";
 
     log("Loaded owner/operator.");
   }
@@ -469,18 +460,6 @@
   async function readBalance(token, user, blockTag = "latest") {
     const res = await ethCall(token, encodeBalanceOf(user), blockTag);
     return hexToBigInt(res);
-  }
-
-  async function loadCurrentBalances() {
-    await ensureEthereum();
-    const wallet = normAddr(userEl.value);
-    const [paxg, xaut] = await Promise.all([
-      readBalance(normAddr(token1El.value), wallet),
-      readBalance(normAddr(token2El.value), wallet)
-    ]);
-    document.getElementById("livePaxg").textContent = formatTokenAmount(paxg, 18);
-    document.getElementById("liveXaut").textContent = formatTokenAmount(xaut, 6);
-    log("Current reference-wallet balances loaded (not performance metrics).");
   }
 
   async function getBlockNumber() {
@@ -778,7 +757,6 @@
     if (!Number.isFinite(chunk) || chunk < 500) chunk = 50000;
 
     await ensureEthereum();
-    if (!userEl.value.trim()) throw new Error("Public reference wallet is missing.");
     const user = normAddr(userEl.value);
     await validateGnewContract(runner, token1, token2);
 
@@ -866,7 +844,7 @@
     if (firstEqIdx === -1) {
       setProgress(100, "done");
       modeEl.innerHTML = `<span class="pill bad">NO EQUALIZE FOUND</span>`;
-      modeNoteEl.textContent = "No successful Equalize seen in the scanned range. Current balances above are live, but no trading-performance history can be inferred.";
+      modeNoteEl.textContent = "No RunSwapOk with isEqualizePhase=true was found for this user. Check From Block / addresses.";
       runsFoundEl.textContent = "0";
       rangeInfoEl.textContent = `scanned ${fromBlock} → ${latestBlock}`;
       log("No successful Equalize found for this user in scanned range.");
@@ -1177,14 +1155,17 @@
   // ============================================================
   // Wire buttons
   // ============================================================
+  document.getElementById("connect").onclick = async () => {
+    try { await connect(); } catch (e) { log("ERROR: " + (e?.message || e)); }
+  };
+
   document.getElementById("loadInfo").onclick = async () => {
-    try { await loadInfo(); await loadCurrentBalances(); } catch (e) { log("ERROR: " + (e?.message || e)); }
+    try { await loadInfo(); } catch (e) { log("ERROR: " + (e?.message || e)); }
   };
 
   document.getElementById("loadHistory").onclick = async () => {
     try {
       setProgress(0, "starting...");
-      await loadCurrentBalances();
       await loadAllHistory();
     } catch (e) {
       setProgress(0, "failed");
@@ -1199,21 +1180,7 @@
     // charts are redrawn on load; if you want live resize, reload history
   });
 
-  // Fixed reference configuration: visitors cannot change which wallet is showcased.
-  [runnerEl, userEl, token1El, token2El, fromBlockEl].forEach(input => { input.readOnly = true; });
-  log("Ready. Read-only public view; loading verified Ethereum data...");
-  (async () => {
-    try {
-      await loadInfo();
-      await loadCurrentBalances();
-      await loadAllHistory();
-    } catch (e) {
-      setProgress(0, "failed");
-      log("ERROR: " + (e?.message || e));
-      modeEl.textContent = "DATA UNAVAILABLE";
-      modeNoteEl.textContent = "Unable to verify data from public RPC. Refresh to retry; do not interpret missing results as no activity.";
-    }
-  })();
+  log("Ready. Check RPC → Load Owner/Operator → Load Full History");
 })();
 </script>
 </body>
